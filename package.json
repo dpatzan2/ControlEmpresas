@@ -12,12 +12,14 @@
   "dependencies": {
     "bcrypt-nodejs": "^0.0.3",
     "cors": "^2.8.5",
+    "excel4node": "^1.7.2",
     "express": "^4.17.3",
     "jwt-simple": "^0.5.6",
     "moment": "^2.29.1",
     "mongoose": "^6.2.2",
     "nodemon": "^2.0.15",
     "pdfkit": "^0.13.0",
+    "pdfkit-construct": "^1.2.3",
     "pdfmake": "^0.2.4"
   }
 }

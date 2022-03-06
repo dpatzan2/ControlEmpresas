@@ -27,7 +27,10 @@ api.put('/empleados/editar/:idEmpleado', md_autenticacion.Auth, empleadoControll
 api.delete('/empleados/eliminar/:idEmpleado', md_autenticacion.Auth, empleadoController.eliminarEmpleados);
 
 //GENERAR PDF
-api.get('/empleados/generarPDF', md_autenticacion.Auth, empleadoController.generarPDF);
+api.get('/empleados/generarPDF', md_autenticacion.Auth, empleadoController.obtenerID);
+
+//GENERAR EXCEL
+api.get('/empleados/generarExcel', md_autenticacion.Auth, empleadoController.obtenerIDParaExcel);
 
 
 module.exports = api;

@@ -4,7 +4,13 @@ const Usuarios = require('../models/usuarios.model');
 const fs = require('fs'); 
 const Pdfmake = require('pdfmake'); 
 
+const xl = require('excel4node');
 
+const PdfkitConstruct = require('pdfkit-construct');
+
+const path = require('path');
+
+ 
 //METODO PARA OBTENER TODOS LOS EMPLEADOS DE UNA EMPRESA
 
 function obtenerEmpleadosPorEmpresa(req, res) {
@@ -170,8 +176,8 @@ function agregarEmpleados(req, res){
             empleadosModel.puesto = parametros.puesto;
             empleadosModel.departamento = parametros.departamento;
 
-                if(req.user.rol == 'ADMIN'){
-                    return res.status(500).send({ mensaje: "Esta no es una empresa"});
+                if(req.user.rol == 'ADMIN' && !parametros.idEmpresa){
+                    return res.status(500).send({ mensaje: "El administrador debe especificar el id de la empresa para agregar el empleado"});
                 }else{
                 empleadosModel.save((err, empleadoGuardado) => {
                     if(err) return res.status(500).send({ mensaje: "Error en la peticion" });
@@ -268,13 +274,70 @@ function eliminarEmpleados(req, res) {
 
 //METODO PARA GENERAR UN PDF CON EL LISTADO DE LOS EMPLEADOS DE UNA DETERMINADA EMPRESA
 
-var usuarioLogueado
 function obtenerID(req, res){
-    usuarioLogueado = req.user.sub;
-    generarPDF();
+    var logueado;
+    var parametros = req.body;
+    if(req.user.rol == 'ADMIN'){
+        if(parametros.idEmpresa){
+            Empleados.find({idEmpresa: parametros.idEmpresa}, (err, empleadoEncontrado) => { 
+                if(err) return res.status(500) .send({ mensaje: 'Error en la peticion' }); 
+
+                logueado = 'DatosEmpresaDesdeAdmin';
+                for (let i = 0; i < empleadoEncontrado.length ; i++) { 
+                    obtenerPDF(empleadoEncontrado, logueado);
+                } 
+            }) 
+        }else{
+            return res.status(500).send({mensaje: 'Coloque el id de la empresa para generar el pdf'});
+        }
+    }else{
+        Empleados.find({idEmpresa: req.user.sub}, (err, empleadoEncontrado) => { 
+            if(err) return res.status(500) .send({ mensaje: 'Error en la peticion' }); 
+
+            logueado = req.user.nombre;
+            for (let i = 0; i < empleadoEncontrado.length ; i++) { 
+                obtenerPDF(empleadoEncontrado, logueado);
+            } 
+        }) 
+    }
+    
+    
 }
 
-function generarPDF(req, res) {
+function obtenerPDF(empleadoEncontrado, logueado)  {
+    let contador = 0;
+    const doc = new PdfkitConstruct({
+        bufferPages: true,
+    });
+
+    doc.setDocumentHeader({}, () => {
+
+
+        doc.lineJoin('miter')
+            .rect(0, 0, doc.page.width, doc.header.options.heightNumber).fill("#ededed");
+
+        doc.fill("#115dc8")
+            .fontSize(20)
+            .text("Lista de empleados de: \n" + logueado + '\n', doc.header.x, doc.header.y);
+    });
+    for (let i = 0; i < empleadoEncontrado.length; i++) {
+        contador++;
+        doc.text('\n Empleado '+contador+ 
+        ' \n ID Empleado: '+ empleadoEncontrado[i].id+
+        ' \n Nombre: '+empleadoEncontrado[i].nombre+' '+empleadoEncontrado[i].apellido+
+        ' \n Puesto: '+empleadoEncontrado[i].puesto+
+        ' \n Departamento: '+empleadoEncontrado[i].departamento);
+    }
+
+    doc.text('\n Total de empleados en la empresa ' + empleadoEncontrado.length)
+    doc.render();
+    doc.pipe(fs.createWriteStream('pdfs/'+ logueado+ '-empleados'+'.pdf'));
+    doc.end();
+}
+
+/*function generarPDF(empleadoEncontrado, logueado) {
+    //var logueado = req.user.sub;
+    let contador = 0;
     var fonts = { 
         Roboto: { 
             normal:'./fonts/Roboto/Roboto-Regular.ttf', 
@@ -283,25 +346,133 @@ function generarPDF(req, res) {
             bolditalics: './fonts/Roboto/Roboto-MediumItalic.ttf' } 
             }; 
             let pdfmake = new Pdfmake(fonts); 
-            let content = [{ 
-                 text: 'Titulo',
-                 }] 
-                Empleados.find({idEmpresa: req.user.sub}, (err, empleadoEncontrado) => { 
-                    if(err) return res.status(500) .send({ mensaje: 'Error en la peticion' }); 
-                    for (let i = 0; i < empleadoEncontrado.length ; i++) { 
-                        console.log(empleadoEncontrado);
-                        content.push({ 
-                            text:'Sus empleados son: '+' '+empleadoEncontrado[i].nombre+' '+empleadoEncontrado[i].apellido,
-                        }) 
-                    } 
-                }) 
+            let content = [{
+                text: "Lista de empleados de: \n" + logueado + '\n',
+                alignment: 'center',
+                fontSize: 40,
+                color: '#e60000',
+                
+            }]
+            for (let i = 0; i < empleadoEncontrado.length; i++) {
+                contador++;
+                content.push({
+                    text: '\n Empleado '+contador+
+                    ': \n \t Nombre: '+empleadoEncontrado[i].nombre+' '+empleadoEncontrado[i].apellido+
+                    ' \n \t Puesto: '+empleadoEncontrado[i].puesto+
+                    ' \n \t Departamento: '+empleadoEncontrado[i].departamento,
+
+                })
+            }
+            
+
+            content.push({
+                text: '\n Total de empleados en la empresa ' + empleadoEncontrado.length 
+                
+            })
+                
         let docDefination = { 
-            content: content 
+            content: content
         }
+
+        
         let pdfDoc = pdfmake.createPdfKitDocument(docDefination, {});
-        pdfDoc.pipe(fs.createWriteStream('pdfs/test.pdf'));
+        pdfDoc.pipe(fs.createWriteStream('pdfs/'+ logueado+ '-empleados'+'.pdf'));
         pdfDoc.end();
+}*/
+
+function obtenerIDParaExcel(req, res){
+    var logueado;
+    var parametros = req.body;
+    if(req.user.rol == 'ADMIN'){
+        if(parametros.idEmpresa){
+            Empleados.find({idEmpresa: parametros.idEmpresa}, (err, empleadoEncontrado) => { 
+                if(err) return res.status(500) .send({ mensaje: 'Error en la peticion' }); 
+
+                logueado = 'DatosEmpresaDesdeAdmin';
+                for (let i = 0; i < empleadoEncontrado.length ; i++) { 
+                    generarExcel(empleadoEncontrado, logueado);
+                } 
+            }) 
+        }else{
+            return res.status(500).send({mensaje: 'Coloque el id de la empresa para generar el pdf'});
+        }
+    }else{
+        Empleados.find({idEmpresa: req.user.sub}, (err, empleadoEncontrado) => { 
+            if(err) return res.status(500) .send({ mensaje: 'Error en la peticion' }); 
+
+            logueado = req.user.nombre;
+            for (let i = 0; i < empleadoEncontrado.length ; i++) { 
+                generarExcel(empleadoEncontrado, logueado);
+            } 
+        }) 
+    }
+    
+    
 }
+
+
+function generarExcel(empleadoEncontrado, logueado){
+    var ContadorColumna = 4;
+
+    var wb =  new xl.Workbook();
+    var ws = wb.addWorksheet('Empleados');
+    var style = wb.createStyle({
+        font: {
+            bold: true,
+            color: '#000000',
+            //fillColor: '#7BC5FA', 
+            size: 12,
+        }
+    });
+
+    var greenS = wb.createStyle({
+        font: {
+            bold: true,
+            color: '#ffffff',
+            size: 12,
+        },
+        fill: {
+            type: 'pattern', 
+            patternType: 'solid', 
+            fgColor: '#49cc25' 
+        }
+    });
+
+    ws.cell(1, 1).string('Empleados de ' + logueado);
+    ws.cell(2, 1).string('Empleados total ' + empleadoEncontrado.length);
+    ws.cell(4, 1).string('ID empleado').style(greenS);
+    ws.cell(4, 2).string('Empleado').style(greenS);
+    ws.cell(4, 3).string('Puesto').style(greenS);
+    ws.cell(4, 4).string('Departamento').style(greenS);
+    for(let i = 0; i < empleadoEncontrado.length ; i++){
+        ContadorColumna++;
+        ContadorFila++;
+        ws.cell(ContadorColumna, 1).string(empleadoEncontrado[i].id).style(style);
+        ws.cell(ContadorColumna, 2).string(empleadoEncontrado[i].nombre + ' ' + empleadoEncontrado[i].apellido ).style(style);
+        ws.cell(ContadorColumna, 3).string(empleadoEncontrado[i].puesto ).style(style);
+        ws.cell(ContadorColumna, 4).string(empleadoEncontrado[i].departamento ).style(style);
+    }
+
+    
+
+   const pathExcel = path.join(__dirname, '../../Excel', logueado+ '-empleados'+'.xlsx');
+
+    wb.write(pathExcel,function(err, stats){
+        if(err){
+            console.log('err');
+        }else{
+            function downloadFile(){
+                //res.download(pathExcel);
+            }
+            downloadFile();
+            return false
+        }
+    })
+}
+
+
+
+
 
 
 module.exports = {
@@ -314,5 +485,6 @@ module.exports = {
     editarEmpleado,
     eliminarEmpleados,
     cantidadEmpleados,
-    generarPDF
+    obtenerID,
+    obtenerIDParaExcel,
 }
