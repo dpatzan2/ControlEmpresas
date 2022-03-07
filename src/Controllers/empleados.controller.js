@@ -446,7 +446,6 @@ function generarExcel(empleadoEncontrado, logueado){
     ws.cell(4, 4).string('Departamento').style(greenS);
     for(let i = 0; i < empleadoEncontrado.length ; i++){
         ContadorColumna++;
-        ContadorFila++;
         ws.cell(ContadorColumna, 1).string(empleadoEncontrado[i].id).style(style);
         ws.cell(ContadorColumna, 2).string(empleadoEncontrado[i].nombre + ' ' + empleadoEncontrado[i].apellido ).style(style);
         ws.cell(ContadorColumna, 3).string(empleadoEncontrado[i].puesto ).style(style);
